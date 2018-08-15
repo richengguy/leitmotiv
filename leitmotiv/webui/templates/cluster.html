@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>leitmotiv</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/leitmotiv.scss.css') }}">
+</head>
+<body>
+    <h1>Centres:</h1>
+    <div class="image-grid">
+        <ul>
+            {% for centre in centres %}
+            <li>
+                <div class="thumbnail">
+                    <img src="{{ url_for('view.thumb', hash=centre) }}">
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <h1>Clusters:</h1>
+    {% for cluster in clusters %}
+    <h2>{{ loop.index }}</h2>
+    <div class="image-grid">
+        <ul>
+            {% for _, hash in cluster %}
+            <li>
+                <div class="thumbnail">
+                    <img src="{{ url_for('view.thumb', hash=hash) }}">
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+</body>
+</html>

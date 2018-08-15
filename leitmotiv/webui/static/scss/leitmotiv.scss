@@ -1,0 +1,33 @@
+/**
+ * leitmotiv stylesheet
+ */
+
+@import "./fonts";
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Raleway", sans-serif;
+}
+
+.image-grid {
+    ul {
+        display: inline;
+        margin: 0;
+        padding: 0;
+    }
+
+    li {
+        display: inline-block;
+    }
+
+    .thumbnail {
+        img {
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
+        }
+    }
+}

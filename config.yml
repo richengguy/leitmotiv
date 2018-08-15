@@ -1,0 +1,29 @@
+# Default leitmotiv configuration.
+leitmotiv:
+    # Application Database
+    library:
+        path: ./library
+        thumbnail:
+            width: 256
+            height: 256
+
+    # Multiprocessing
+    num_threads: 2
+    num_workers: 12
+
+    # Web interface
+    webui:
+        port: 5000
+        distances: distances.npy
+
+    # GMM Configuration
+    GMM:
+        alpha: 0.01
+        max_clusters: 50
+        samples: 5000
+        sigma: 3
+        colour_space: lab
+
+    # Database Index
+    # index:
+    #     knn: 10

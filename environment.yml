@@ -1,0 +1,13 @@
+name: leitmotiv
+channels:
+  - defaults
+dependencies:
+  - python=3.6
+  - numpy=1.14.2
+  - pillow=5.0.0
+  - pip # get the latest version of 'pip'
+  - pytables=3.4.4
+  - mkl-service=1.1.2
+  - scikit-image=0.13.1
+  - scikit-learn=0.19.1
+  - scipy=1.0.0

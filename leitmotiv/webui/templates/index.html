@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>leitmotiv</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/leitmotiv.scss.css') }}">
+</head>
+<body>
+    <h1>Images:</h1>
+    {% if sorted %}
+    <h2>Is Sorted</h2>
+    <a href="{{ url_for('view.index') }}">Back</a>
+    {% endif %}
+    <div class="image-grid">
+        <ul>
+            {% for hash in images %}
+            <li>
+                <div class="thumbnail">
+                    <a href="{{ url_for('view.ranked', hash=hash[0]) }}">
+                        <img src="{{ url_for('view.thumb', hash=hash[0]) }}">
+                    </a>
+                    <!-- <span>Image: {{imgid}}</span> -->
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
