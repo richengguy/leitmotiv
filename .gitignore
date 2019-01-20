@@ -1,8 +1,8 @@
 # Project-specific
 *.npy
 library/
-leitmotiv/webui/static/css/*.css
-leitmotiv/webui/static/css/*.map
+**/webui/static/css/*.css
+**/webui/static/css/*.map
 .python-version
 
 # IDEs

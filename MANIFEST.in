@@ -1,0 +1,6 @@
+# Include the webui resources.
+recursive-include leitmotiv/webui/static *
+recursive-include leitmotiv/webui/templates *
+
+# Remove an CSS files as they get auto-generated.
+recursive-exclude leitmotiv/webui/static *.css *.css.map
