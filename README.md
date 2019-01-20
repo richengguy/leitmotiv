@@ -24,7 +24,7 @@ Jensen-Shannon divergences.  The JS-divergence has some nice properties, such as
 being symmetric divergences, that makes it convenient to use in this
 application.  The resulting set of pairwise distances is then partitioned using
 [affinity propagation](http://scikit-learn.org/stable/modules/clustering.html#affinity-propagation)
-because it can work with distance matices directly.
+because it can work with distance matrices directly.
 
 The application uses GMMs to represent images because these are *generative*
 models.  That means you can pull *new* values from the modelled distribution.
@@ -99,7 +99,7 @@ Images are ordered from most to least similar to the selected image (top-left
 corner).  The default view shows images ordered by date captured.  Selected an
 image will produce a page like the one below.
 
-![ranked-images](ranked.png)
+![ranked-images](docs/img/ranked.png)
 
 **Image Clusters**
 
@@ -132,7 +132,7 @@ $ sudo ./scripts/add-images.sh /path/to/images
 
 This usually requires passing a full path, e.g. `/home/username/images` since
 Docker has to be able to mount the path in read-only mode.  This script may take
-a while to run as it is processing all of the images in the provided directoyr.
+a while to run as it is processing all of the images in the provided directory.
 The leitmotiv webui is started by
 
 ```bash
