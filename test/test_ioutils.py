@@ -1,9 +1,11 @@
 import base64
+import os.path
 
 import numpy as np
+import skimage
 
-from leitmotiv.io import deserialize_array
-from leitmotiv.io import serialize_ndarray
+from leitmotiv.io import (deserialize_array, serialize_ndarray, imread,
+                          to_ndarray)
 
 
 def test_serialize():
@@ -24,3 +26,31 @@ def test_deserialize():
     assert len(newarr.shape) == 2
     assert newarr.shape == (3, 3)
     assert (newarr == np.eye(3)).all()
+
+
+def test_load_png():
+    '''Can load a PNG without any EXIF data.'''
+    path = os.path.join(skimage.data_dir, 'astronaut.png')
+
+    # Read the image.
+    img, exif = imread(path, return_exif=True)
+    assert img.size == (512, 512)
+    assert exif is None
+
+    # Convert to a numpy array.
+    img = to_ndarray(img)
+    assert img.shape == (512, 512, 3)
+
+
+def test_load_jpeg(samples_directory):
+    '''Can load a JPEG with some EXIF data.'''
+    path = os.path.join(samples_directory, 'yonge-dundas.jpg')
+
+    # Read the image.
+    img, exif = imread(path, return_exif=True)
+    assert img.size == (2000, 867)
+    assert exif is not None
+
+    # Convert to a numpy array.
+    img = to_ndarray(img)
+    assert img.shape == (867, 2000, 3)

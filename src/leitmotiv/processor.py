@@ -190,7 +190,7 @@ class Processor(object):
                     pass
             except KeyboardInterrupt:
                 if not self._tqdm_args['disable']:
-                        tqdm.write('Cancelling jobs...please wait.')
+                    tqdm.write('Cancelling jobs...please wait.')
                 for f in futures:
                     f.cancel()
 

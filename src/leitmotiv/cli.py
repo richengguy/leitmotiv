@@ -176,5 +176,13 @@ def build_index(config, skip_distances):
             hdf5.create_array(grp, 'indices', list(hashes.values()))
 
 
+@main.command('train-model')
+@click.option('--skip-distances', is_flag=True,
+              help='Skip computing the pairwise distances.')
+@click.pass_obj
+def train_model(config, skip_distances):
+    pass
+
+
 if __name__ == '__main__':
     main()
