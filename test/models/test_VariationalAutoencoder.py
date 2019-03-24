@@ -155,7 +155,6 @@ class TestVariationalAutoencoder(object):
     '''Test the VariationalAutoencoder class.'''
     def test_init(self):
         vae = VariationalAutoencoder(64, 512)
-        assert vae._log_prob_const == pytest.approx(0.0)
         assert len(vae.model.encoder.convnet) == 9
         assert len(vae.model.decoder.convnet) == 9
 

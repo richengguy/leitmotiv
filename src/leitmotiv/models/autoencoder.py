@@ -109,7 +109,7 @@ class Encoder(torch.nn.Module):
             raise ValueError('Image dimension must be a power-of-two.')
 
         layers = []
-        layers.append(('input', _encoder_block(3, 8, 5)))
+        layers.append(('input', _encoder_block(3, 8, 3)))
         for i in range(nlayers-2):
             C_in = 2**(i+3)
             C_out = 2**(i+4)
@@ -267,13 +267,9 @@ class VariationalAutoencoder(Model):
         self._width = width
         self._in_training = False
         self._optim_type = torch.optim.Adam
+        self._log_prob_scale = 1.0/(2.0*sigma**2)
         self.model = VAEModel(ndim, width)
         self.optim = self._OPTIM_TYPE(self.model.parameters())
-
-        # These two properties are derived from the 'sigma' parameter.  They
-        # are constants within the log-likelihood calculation for a Gaussian.
-        self._log_prob_const = -(width**2/2.0)*np.log(sigma**2)
-        self._log_prob_scale = 1.0/(2.0*sigma**2)
 
     def to_gpu(self):
         '''Move the model onto the GPU.'''
@@ -315,7 +311,7 @@ class VariationalAutoencoder(Model):
         # Compute the log-likelihood of the reconstruction under a Gaussian
         # prior.
         l2 = torch.sum((reconstruction - data)**2)
-        log_likelihood = self._log_prob_const - self._log_prob_scale*l2
+        log_likelihood = -self._log_prob_scale*l2
 
         # Compute the Kullbeck-Leibler divergence.
         kl = 0.5*torch.sum((mu**2 + sigma**2 - torch.log(sigma**2) - 1.0))
