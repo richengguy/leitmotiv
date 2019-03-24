@@ -80,7 +80,11 @@ def imread(fname, return_exif=False, inspect_exif=True):
         the image's EXIF data (only if ``return_exif`` is ``True``)
     '''
     img = Image.open(fname)
-    exif = img._getexif()
+    try:
+        exif = img._getexif()
+    except AttributeError:
+        exif = None
+        inspect_exif = False
 
     if inspect_exif:
         orientation = get_orientation(img)
