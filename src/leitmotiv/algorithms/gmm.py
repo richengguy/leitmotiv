@@ -341,7 +341,7 @@ class GMM(EMAlgorithm):
             'Performing K-means initialization with %d clusters.',
             self._num_models)
         kmeans = sklearn.cluster.KMeans(n_clusters=self._num_models,
-                                        n_jobs=-2)
+                                        n_jobs=2)
         kmeans.fit(x.T)
 
         for i in range(self._num_models):
@@ -499,7 +499,7 @@ class AdaptiveGMM(EMAlgorithm):
             'Performing K-means initialization with %d initial clusters.',
             self.max_models)
         kmeans = sklearn.cluster.KMeans(n_clusters=self.max_models,
-                                        n_jobs=-2)
+                                        n_jobs=2)
         kmeans.fit(x.T)
         mu_init = np.mean(x, axis=1)[:, np.newaxis]
         weights_init = np.zeros((1, x.shape[1]))

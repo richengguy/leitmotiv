@@ -48,7 +48,10 @@ class InsertImages(object):
         thumb : bytes
             image thumbnail
         '''
-        img, exif = imread(path, return_exif=True)
+        try:
+            img, exif = imread(path, return_exif=True)
+        except BaseException as e:
+            raise RuntimeError('Failed to load %s' % path) from e
 
         # Generate the image hash.
         sha256 = hashlib.sha256()
@@ -62,11 +65,13 @@ class InsertImages(object):
         img.save(thumb, 'jpeg', quality=90)
 
         # Obtain the date-time.
+        dt = datetime.datetime.today()
         try:
-            dt = datetime.datetime.strptime(exif[_EXIF_DATETIME_ORIGINAL],
-                                            '%Y:%m:%d %H:%M:%S')
+            if exif is not None:
+                dt = datetime.datetime.strptime(exif[_EXIF_DATETIME_ORIGINAL],
+                                                '%Y:%m:%d %H:%M:%S')
         except KeyError:
-            dt = None
+            pass
 
         return path, image_hash, dt, thumb
 

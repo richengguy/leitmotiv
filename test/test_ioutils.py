@@ -2,6 +2,7 @@ import base64
 import os.path
 
 import numpy as np
+import pytest
 import skimage
 
 from leitmotiv.io import (deserialize_array, serialize_ndarray, imread,
@@ -54,3 +55,23 @@ def test_load_jpeg(samples_directory):
     # Convert to a numpy array.
     img = to_ndarray(img)
     assert img.shape == (867, 2000, 3)
+
+
+def test_load_jpeg_with_stripped_exif(samples_directory):
+    '''Can load a JPEG where the EXIF data has been removed.'''
+    path = os.path.join(samples_directory, 'IMG_3247.jpg')
+
+    # Read the image.
+    img, exif = imread(path, return_exif=True)
+    assert img.size == (128, 85)
+    assert exif is None
+
+    # Convert to a numpy array.
+    img = to_ndarray(img)
+    assert img.shape == (85, 128, 3)
+
+
+def test_to_ndarray_without_PIL_image_raises_exception():
+    '''Exception raised if to_ndarray() used incorrectly.'''
+    with pytest.raises(ValueError):
+        to_ndarray(np.zeros((128, 128, 3)))

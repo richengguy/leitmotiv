@@ -46,6 +46,8 @@ def get_orientation(img):
     '''
     try:
         exif = img._getexif()
+        if exif is None:
+            raise AttributeError
     except AttributeError:
         return ExifOrientation.Original
 
@@ -146,12 +148,6 @@ def to_ndarray(img, sz=None, ignore_exif=False):
     if not isinstance(img, Image.Image):
         raise ValueError('Expected a PIL.Image instance.')
 
-    # Extract the EXIF data if it exists.
-    try:
-        exif = img._getexif()
-    except AttributeError:
-        ignore_exif = True
-
     # Create a copy of the image before resizing it.
     img = img.copy()
     if sz is not None:
@@ -162,12 +158,8 @@ def to_ndarray(img, sz=None, ignore_exif=False):
 
     # Finally, check to see if a rotation is required.
     if not ignore_exif:
-        if _EXIF_ORIENTATION in exif:
-            rotation = ExifOrientation(exif[_EXIF_ORIENTATION])
-        else:
-            rotation = ExifOrientation.Original
-
         # Rotate the image depending on the EXIF tag value.
+        rotation = get_orientation(img)
         if rotation == ExifOrientation.Rotate180:
             data = np.flip(data, 1)
         elif rotation == ExifOrientation.Rotate90:

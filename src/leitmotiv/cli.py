@@ -60,7 +60,7 @@ def _process_images(config, images):
     images : list
         list of images
     '''
-    processor = Processor()
+    processor = Processor(nproc=config['num_workers'])
 
     processor.set_message('Inserting images')
     hashes = processor.mapreduce(images, actions.InsertImages(config))
