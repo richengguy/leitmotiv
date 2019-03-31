@@ -11,8 +11,6 @@ from ruamel.yaml import YAML
 import torch
 from torch.utils.data import DataLoader
 
-from tqdm import tqdm
-
 from leitmotiv import actions
 from leitmotiv import library
 from leitmotiv import models
@@ -193,43 +191,39 @@ def build_index(config, skip_distances):
 def train_model(config, epochs, batch_size):
     '''Command for training the VAE.'''
     with library.Library() as lib:
-        dataset = models.Dataset(lib, img_dim=256, to_gpu=True)
-        model = models.VariationalAutoencoder(1024, dataset.img_dim, 0.15)
-
         click.echo('Training Device: ', nl=False)
-        if torch.cuda.is_available():
+        use_gpu = torch.cuda.is_available()
+        if use_gpu:
             click.secho('CUDA', bold=True)
-            device = torch.device('cuda')
-            model.to_gpu()
         else:
             click.secho('CPU', bold=True)
-            device = torch.device('cpu')
 
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        losses = {'elbo': [], 'log_likelihood': [], 'kl': []}
-
-        progbar = tqdm(total=epochs*len(dataset), desc='Sample')
-        for epoch in range(epochs):
-            for img in dataloader:
-                img = img.to(device)
-                loss = model.train(img)
-                for k, v in loss.items():
-                    losses[k].append(v)
-                progbar.update(img.shape[0])
-        progbar.close()
+        dataset = models.Dataset(lib, img_dim=256, to_gpu=use_gpu)
+        model = models.VariationalAutoencoder(256, dataset.img_dim, sigma=0.9)
+        trainer = models.ModelTrainer(batch_size, epochs, split=0.05,
+                                      verbose=True, use_gpu=use_gpu)
+        losses, validation = trainer.train(model, dataset)
 
         dataloader = DataLoader(dataset, batch_size=16, shuffle=False)
         for i, imgs in enumerate(dataloader):
             mu, _ = model.infer(imgs)
             torchvision.utils.save_image(imgs, 'inputs-%d.png' % i)
             torchvision.utils.save_image(model.generate(mu), 'outputs-%d.png' % i)  # noqa: E501
+            break
 
         plt.figure()
         plt.plot(losses['elbo'])
         plt.title('Loss Function')
-        plt.xlabel('Iteration')
+        plt.xlabel('Epoch')
         plt.ylabel('ELBO')
         plt.savefig('training-loss.png')
+
+        plt.figure()
+        plt.plot(validation['elbo'])
+        plt.title('Loss Function')
+        plt.xlabel('Epoch')
+        plt.ylabel('ELBO')
+        plt.savefig('validation-loss.png')
 
 
 if __name__ == '__main__':

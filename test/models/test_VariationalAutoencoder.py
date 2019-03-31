@@ -164,10 +164,10 @@ class TestVariationalAutoencoder(object):
 
         with torch.no_grad():
             vae = VariationalAutoencoder(2, 32)
-            elbo, log_likelihood, kl = vae.cost(input)
+            scores = vae.score(input)
 
-        assert elbo.dim() == 0
-        assert elbo.allclose(log_likelihood - kl)
+        assert scores['elbo'].dim() == 0
+        assert scores['elbo'].allclose(scores['log_likelihood'] - scores['kl'])
 
     @pytest.mark.parametrize('nimg', [1, 2, 3, 4])
     def test_train(self, nimg):

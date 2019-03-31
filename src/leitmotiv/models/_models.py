@@ -32,6 +32,27 @@ class Model(abc.ABC):
         '''
 
     @abc.abstractmethod
+    def score(self, data):
+        '''Calculate the loss function on some given data.
+
+        The score (or loss) gives an idea of how well the model describes, or
+        fits the data that it has been trained on.  It can't indicate how good
+        the model is on its own, as that usually requires data not in the
+        training set.  The score is also used internally during training of the
+        model.
+
+        Parameters
+        ----------
+        data : :class:`torch.Tensor` or :class:`numpy.ndarray`
+            a multi-dimensional array containing the training data
+
+        Returns
+        -------
+        :class:`torch.Tensor` or dict
+            the current training cost(s), all stored as PyTorch scalars
+        '''
+
+    @abc.abstractmethod
     def train(self, data):
         '''Train the model on some data set.
 
@@ -48,8 +69,8 @@ class Model(abc.ABC):
 
         Returns
         -------
-        float or dict
-            the current training cost(s)
+        :class:`torch.Tensor` or dict
+            the current training cost(s), all stored as PyTorch scalars
         '''
 
     @abc.abstractmethod

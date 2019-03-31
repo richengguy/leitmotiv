@@ -15,8 +15,11 @@ class SimpleModel(Model):
     def to_cpu(self):
         pass
 
-    def train(self, data):
+    def score(self, data):
         return self.a + self.b
+
+    def train(self, data):
+        return self.score(data)
 
     def infer(self, data):
         return self.a*self.b

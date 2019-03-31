@@ -245,12 +245,8 @@ class VariationalAutoencoder(Model):
     ----------
     model : :class:`VAEModel`
         the model that implements the VAE
-    optim : :class:`torch.optim.Optimizer`
-        optimizer used for training the VAE
     '''
-    _OPTIM_TYPE = torch.optim.Adam
-
-    def __init__(self, ndim, width, sigma=1.0):
+    def __init__(self, ndim, width, sigma=1.0, lr=2e-4, betas=(0.5, 0.999)):
         '''
         Parameters
         ----------
@@ -262,27 +258,37 @@ class VariationalAutoencoder(Model):
         sigma : float
             hyperparameter used to control how close the reconstruction must be
             to the original image
+        lr : float
+            learning rate
+        betas : tuple
+            value of the two beta parameters used in the Adam optimizer
         '''
         self._ndim = ndim
         self._width = width
         self._in_training = False
         self._optim_type = torch.optim.Adam
         self._log_prob_scale = 1.0/(2.0*sigma**2)
+        self._opt_args = {'lr': lr, 'betas': betas}
+
         self.model = VAEModel(ndim, width)
-        self.optim = self._OPTIM_TYPE(self.model.parameters())
+        self._init_optim()
+
+    def _init_optim(self):
+        '''Initialized the optimizer.'''
+        self.optim = torch.optim.Adam(self.model.parameters(), **self._opt_args)  # noqa: E501
 
     def to_gpu(self):
         '''Move the model onto the GPU.'''
         if torch.cuda.is_available():
             self.model.cuda()
-            self.optim = self._OPTIM_TYPE(self.model.parameters())
+            self._init_optim()
 
     def to_cpu(self):
         '''Move the model onto the CPU.'''
         self.model.cpu()
-        self._optim = self._OPTIM_TYPE(self.model.parameters())
+        self._init_optim()
 
-    def cost(self, data):
+    def score(self, data):
         '''Compute the cost of the model on some data.
 
         The cost calculated with the Evidence Lower BOund (ELBO), which is the
@@ -294,6 +300,8 @@ class VariationalAutoencoder(Model):
         data : :class:`torch.Tensor`
             the images used for training, stored as a
             :math:`N \\times 3 \\times W \\times W` tensor
+        beta : float
+            regularization parameter used when computing the ELBO
 
         Returns
         -------
@@ -306,6 +314,10 @@ class VariationalAutoencoder(Model):
             value of the KL divergence between the latent representation and
             the standard Normal distribution
         '''
+        if len(data.shape) == 3:
+            data = torch.unsqueeze(data, 0)
+
+        batch_size = data.shape[0]
         mu, sigma, reconstruction = self.model(data)
 
         # Compute the log-likelihood of the reconstruction under a Gaussian
@@ -316,8 +328,12 @@ class VariationalAutoencoder(Model):
         # Compute the Kullbeck-Leibler divergence.
         kl = 0.5*torch.sum((mu**2 + sigma**2 - torch.log(sigma**2) - 1.0))
 
+        # Scale by the batch size.
+        log_likelihood /= batch_size
+        kl /= batch_size
+
         elbo = log_likelihood - kl
-        return elbo, log_likelihood, kl
+        return {'elbo': elbo, 'log_likelihood': log_likelihood, 'kl': kl}
 
     def train(self, data):
         '''Train the model on the provided images.
@@ -333,6 +349,8 @@ class VariationalAutoencoder(Model):
         data : :class:`torch.Tensor`
             the images used for training, stored as a
             :math:`N \\times 3 \\times W \\times W` tensor
+        beta : float
+            regularization parameter used when computing the ELBO
 
         Returns
         -------
@@ -344,16 +362,12 @@ class VariationalAutoencoder(Model):
             self._in_training = True
 
         self.optim.zero_grad()
-        elbo, log_likelihood, kl = self.cost(data)
-        loss = -elbo
+        scores = self.score(data)
+        loss = -scores['elbo']
         loss.backward()
         self.optim.step()
 
-        return {
-            'elbo': elbo.detach().cpu(),
-            'log_likelihood': log_likelihood.detach().cpu(),
-            'kl': kl.detach().cpu()
-            }
+        return scores
 
     def infer(self, data):
         '''Obtain the data's latent space representation.
