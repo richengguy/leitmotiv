@@ -136,8 +136,10 @@ class ModelTrainer(object):
 
         Returns
         -------
-        dict
-            a dictionary containing the various losses
+        losses : dict
+            losses on the training data set
+        validation : dict
+            losses on the validation data set
 
         Raises
         ------
@@ -201,7 +203,4 @@ class ModelTrainer(object):
 
         progbar.close()
 
-        if self.split is None:
-            return losses
-        else:
-            return losses, validation
+        return losses, validation

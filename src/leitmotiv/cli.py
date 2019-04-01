@@ -199,8 +199,8 @@ def train_model(config, epochs, batch_size):
             click.secho('CPU', bold=True)
 
         dataset = models.Dataset(lib, img_dim=256, to_gpu=use_gpu)
-        model = models.VariationalAutoencoder(256, dataset.img_dim, sigma=0.9)
-        trainer = models.ModelTrainer(batch_size, epochs, split=0.05,
+        model = models.VariationalAutoencoder(dataset.img_dim, sigma=0.9)
+        trainer = models.ModelTrainer(batch_size, epochs, split=None,
                                       verbose=True, use_gpu=use_gpu)
         losses, validation = trainer.train(model, dataset)
 
@@ -213,17 +213,12 @@ def train_model(config, epochs, batch_size):
 
         plt.figure()
         plt.plot(losses['elbo'])
-        plt.title('Loss Function')
-        plt.xlabel('Epoch')
-        plt.ylabel('ELBO')
-        plt.savefig('training-loss.png')
-
-        plt.figure()
         plt.plot(validation['elbo'])
         plt.title('Loss Function')
         plt.xlabel('Epoch')
         plt.ylabel('ELBO')
-        plt.savefig('validation-loss.png')
+        plt.legend(('Training', 'Validation'))
+        plt.savefig('training-losses.png')
 
 
 if __name__ == '__main__':

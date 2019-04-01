@@ -7,6 +7,22 @@ import torch.nn.functional as F
 from leitmotiv.models import Model
 
 
+class _SqueezeLayer(torch.nn.Module):
+    '''Squeezes a layer to make it fully-connected.
+
+    It also will apply batch normalization if the batch size is greater than 1.
+    '''
+    def __init__(self, num_features):
+        super().__init__()
+        self.batch_norm = torch.nn.BatchNorm1d(num_features)
+
+    def forward(self, x):
+        x = torch.squeeze(torch.squeeze(x, 3), 2)
+        if x.shape[0] > 1:
+            x = self.batch_norm(x)
+        return x
+
+
 def _encoder_block(C_in, C_out, K, is_output=False):
     '''Creates an "encoder block".
 
@@ -34,10 +50,13 @@ def _encoder_block(C_in, C_out, K, is_output=False):
     layers = []
     layers.append(('rep2', torch.nn.ReplicationPad2d(K // 2)))
     layers.append(('conv', torch.nn.Conv2d(C_in, C_out, K, stride=2,
-                                           bias=not is_output)))
-    if not is_output:
+                                           bias=False)))
+    if is_output:
+        layers.append(('squeeze', _SqueezeLayer(C_out)))
+    else:
         layers.append(('norm', torch.nn.BatchNorm2d(C_out)))
-        layers.append(('relu', torch.nn.ReLU()))
+
+    layers.append(('relu', torch.nn.ReLU()))
     return torch.nn.Sequential(collections.OrderedDict(layers))
 
 
@@ -71,7 +90,7 @@ def _decoder_block(C_in, C_out, K, is_output=False):
     layers.append(('fconv', torch.nn.ConvTranspose2d(C_in, C_out, K,
                                                      stride=2, padding=1,
                                                      output_padding=1,
-                                                     bias=not is_output)))
+                                                     bias=is_output)))
 
     if is_output:
         layers.append(('sigmoid', torch.nn.Sigmoid()))
@@ -90,13 +109,14 @@ class Encoder(torch.nn.Module):
     inference, each dimension :math:`z_i` in the latent vector :math:`\\vec{z}`
     is assumed to distributed according to a univariate Gaussian
     :math:`z_i \\sim \\mathcal{N}(\\mu_i, \\sigma_i)`.
+
+    The encoder has been set up so that the dimensionality of the latent space
+    will be twice the original input image size.
     '''
-    def __init__(self, ndim, width):
+    def __init__(self, width):
         '''
         Parameters
         ----------
-        ndim : int
-            dimensionality of the latent space
         width : int
             width of the images being sent into the encoder; must be a power of
             two
@@ -108,19 +128,38 @@ class Encoder(torch.nn.Module):
         if np.floor(log2) != np.ceil(log2):
             raise ValueError('Image dimension must be a power-of-two.')
 
+        # The network halves the image size after each convolution.  It also
+        # doubles the number of input channels, producing a structure that
+        # looks something like:
+        #
+        #   width:      64 -> 32 -> 16 ->  8 ->  4 ->   2 ->   1
+        #   channels:    3 ->  8 -> 16 -> 32 -> 64 -> 128 -> 256 -> 128
+        #                                                           |
+        #                                                           V
+        #                                                           64-mu
+        #                                                           64-sigma
+        #
+        # If you generalizing the sequence for some value of 2**N, where N is
+        # a positive integer, then the last tensor has 4x the number of
+        # channels as the input width.  A fully-connected network then
+        # compresses the space down to be 2x the width, so that the
+        # dimensionality of the latent space is the same as the image width.
+
         layers = []
         layers.append(('input', _encoder_block(3, 8, 3)))
         for i in range(nlayers-2):
             C_in = 2**(i+3)
             C_out = 2**(i+4)
             layers.append(('layer%d' % (i+1), _encoder_block(C_in, C_out, 3)))
-        layers.append(('output', _encoder_block(2**(nlayers+1), 2*ndim, 1,
+        layers.append(('output', _encoder_block(2**(nlayers+1), 4*width, 1,
                                                 is_output=True)))
         self.convnet = torch.nn.Sequential(collections.OrderedDict(layers))
+        self.compressor = torch.nn.Linear(4*width, 2*width, bias=False)
 
     def forward(self, x):
         '''Performs a forward pass of the encoder.'''
-        result = self.convnet(x)
+        conv = self.convnet(x)
+        result = self.compressor(conv)
 
         # Extract the mean and stddev from the convolution output and apply the
         # different activation functions so the mean can be positive or
@@ -137,12 +176,10 @@ class Decoder(torch.nn.Module):
     The decoder module takes an N-dimensional vector and then backprojects it
     back to an image.
     '''
-    def __init__(self, ndim, width):
+    def __init__(self, width):
         '''
         Parameters
         ----------
-        ndim : int
-            dimensionality of the latent space
         width : int
             width of the images being sent into the encoder; must be a power of
             two
@@ -154,8 +191,19 @@ class Decoder(torch.nn.Module):
         if np.floor(log2) != np.ceil(log2):
             raise ValueError('Image dimensional must be a power-of-two.')
 
+        # The decoder doublers the image size after each convolution.  It also
+        # halves the number of input channels, doing the exact opposite as the
+        # encoder.  The resulting structure is:
+        #
+        #   width:       1 ->  2 ->  4 ->  8 -> 16 -> 32 -> 64
+        #   channels:   64 -> 64 -> 32 -> 16 ->  8 ->  4 ->  3
+        #
+        # The final output is a 3-channel RGB image.  The sequence is meant to
+        # reverse what the encoder does so it takes some latent vector and puts
+        # it back to the original image space.
+
         layers = []
-        layers.append(('input', _decoder_block(ndim, 2**(nlayers+1), 3)))
+        layers.append(('input', _decoder_block(width, 2**(nlayers+1), 3)))
         for i in range(nlayers-2):
             C_in = 2**(nlayers+1-i)
             C_out = 2**(nlayers-i)
@@ -181,23 +229,19 @@ class VAEModel(torch.nn.Module):
         VAE's encoding half
     decoder : :class:`Decoder`
         VAE's decoding half
-    optim : :class:`torch.optim.Optimizer`
-        optimizer used to train the VAE
     '''
-    def __init__(self, ndim, width):
+    def __init__(self, width):
         '''
         Parameters
         ----------
-        ndim : int
-            number of dimensions of the latent space
         width : int
             width/height that images will be resized to, prior to being sent
             into the VAE
         '''
         super().__init__()
         self._width = width
-        self.encoder = Encoder(ndim, width)
-        self.decoder = Decoder(ndim, width)
+        self.encoder = Encoder(width)
+        self.decoder = Decoder(width)
 
     def forward(self, x):
         '''Apply the network onto some data set.
@@ -226,6 +270,7 @@ class VAEModel(torch.nn.Module):
 
         mu, sigma = self.encoder(x)
         z = mu + sigma*torch.randn_like(mu)
+        z = torch.unsqueeze(torch.unsqueeze(z, -1), -1)
         reconstruction = self.decoder(z)
         return mu, sigma, reconstruction
 
@@ -245,13 +290,15 @@ class VariationalAutoencoder(Model):
     ----------
     model : :class:`VAEModel`
         the model that implements the VAE
+    image_width : int
+        expected width/height of the images going into the VAE
+    dimensionality : int
+        dimensionality of the latent space
     '''
-    def __init__(self, ndim, width, sigma=1.0, lr=2e-4, betas=(0.5, 0.999)):
+    def __init__(self, width, sigma=1.0, lr=2e-4, betas=(0.5, 0.999)):
         '''
         Parameters
         ----------
-        ndim : int
-            number of dimensions of the latent space
         width : int
             width/height that images will be resized to, prior to being sent
             into the VAE
@@ -263,19 +310,27 @@ class VariationalAutoencoder(Model):
         betas : tuple
             value of the two beta parameters used in the Adam optimizer
         '''
-        self._ndim = ndim
+        self._ndim = width
         self._width = width
         self._in_training = False
         self._optim_type = torch.optim.Adam
         self._log_prob_scale = 1.0/(2.0*sigma**2)
         self._opt_args = {'lr': lr, 'betas': betas}
 
-        self.model = VAEModel(ndim, width)
+        self.model = VAEModel(width)
         self._init_optim()
 
     def _init_optim(self):
         '''Initialized the optimizer.'''
         self.optim = torch.optim.Adam(self.model.parameters(), **self._opt_args)  # noqa: E501
+
+    @property
+    def image_width(self):
+        return self._width
+
+    @property
+    def dimensionality(self):
+        return self._ndim
 
     def to_gpu(self):
         '''Move the model onto the GPU.'''
@@ -432,13 +487,16 @@ class VariationalAutoencoder(Model):
         return {
             'model': self.model.state_dict(),
             'width': self._width,
-            'dimensions': self._ndim
+            'dimensions': self._ndim,
+            'opt_args': self._opt_args,
+            'log_prob_scale': self._log_prob_scale
         }
 
     @staticmethod
     def from_dict(model_dict):
         '''Load the model from its dictionary representation.'''
-        vae = VariationalAutoencoder(model_dict['dimensions'],
-                                     model_dict['width'])
+        vae = VariationalAutoencoder(model_dict['width'],
+                                     **model_dict['opt_args'])
+        vae._log_prob_scale = model_dict['log_prob_scale']
         vae.model.load_state_dict(model_dict['model'])
         return vae

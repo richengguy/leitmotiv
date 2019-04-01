@@ -96,14 +96,14 @@ class TestModelTrainer(object):
         dataset = Dataset(library, img_dim=64)
         model = TensorLoss(5.0)
         trainer = ModelTrainer(1, 2)
-        losses = trainer.train(model, dataset)
+        losses, _ = trainer.train(model, dataset)
         assert losses['loss'][0] == pytest.approx(5.0)
 
     def test_dict_loss(self, library):
         dataset = Dataset(library, img_dim=64)
         model = DictLoss(5.0)
         trainer = ModelTrainer(1, 2)
-        losses = trainer.train(model, dataset)
+        losses, _ = trainer.train(model, dataset)
         assert losses['a'][0] == pytest.approx(5.0)
 
     def test_exception_raised_with_incorrect_model_type(self, library):

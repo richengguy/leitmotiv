@@ -32,7 +32,7 @@ def test_decoder_block_size_for_even_dims():
 class TestEncoder(object):
     '''Test the Encoder class.'''
     def test_init(self):
-        encoder = Encoder(64, 512)
+        encoder = Encoder(512)
         assert len(encoder.convnet) == 9
 
         for i in range(9):
@@ -44,7 +44,7 @@ class TestEncoder(object):
                 C_out = C_in * 2
 
             if i == 8:
-                C_out = 128
+                C_out = 2048
 
             print("%d, %d" % (encoder.convnet[i][1].in_channels,
                               encoder.convnet[i][1].out_channels))
@@ -53,36 +53,32 @@ class TestEncoder(object):
             assert encoder.convnet[i][1].out_channels == C_out
 
     def test_forward(self):
-        encoder = Encoder(64, 512)
+        encoder = Encoder(512)
         input = torch.ones((5, 3, 512, 512))
         mu, sigma = encoder(input)
 
-        assert mu.dim() == 4
+        assert mu.dim() == 2
         assert mu.shape[0] == 5
-        assert mu.shape[1] == 64
-        assert mu.shape[2] == 1
-        assert mu.shape[3] == 1
+        assert mu.shape[1] == 512
 
-        assert sigma.dim() == 4
+        assert sigma.dim() == 2
         assert sigma.shape[0] == 5
-        assert sigma.shape[1] == 64
-        assert sigma.shape[2] == 1
-        assert sigma.shape[3] == 1
+        assert sigma.shape[1] == 512
 
     def test_init_incorrect_width_raises_exception(self):
         with pytest.raises(ValueError):
-            Encoder(64, 500)
+            Encoder(500)
 
 
 class TestDecoder(object):
     '''Test the Decoder class.'''
     def test_init(self):
-        decoder = Decoder(64, 512)
+        decoder = Decoder(512)
         assert len(decoder.convnet) == 9
 
         for i in range(9):
             if i == 0:
-                C_in = 64
+                C_in = 512
                 C_out = 1024
             else:
                 C_in = C_out
@@ -98,8 +94,8 @@ class TestDecoder(object):
             assert decoder.convnet[i][0].out_channels == C_out
 
     def test_forward(self):
-        decoder = Decoder(64, 512)
-        input = torch.ones((5, 64, 1, 1))
+        decoder = Decoder(512)
+        input = torch.ones((5, 512, 1, 1))
         output = decoder(input)
 
         assert output.shape[0] == 5
@@ -108,53 +104,53 @@ class TestDecoder(object):
         assert output.shape[3] == 512
 
     def test_forward_squeezed_input_raises_exception(self):
-        decoder = Decoder(64, 512)
+        decoder = Decoder(512)
         input = torch.ones((5, 64))
         with pytest.raises(RuntimeError):
             decoder(input)
 
     def test_init_incorrect_width_raises_exception(self):
         with pytest.raises(ValueError):
-            Decoder(64, 500)
+            Decoder(500)
 
 
 class TestVAEModel(object):
     '''Test the VAEModel class.'''
     def test_init(self):
-        model = VAEModel(64, 512)
+        model = VAEModel(512)
         assert len(model.encoder.convnet) == 9
         assert len(model.decoder.convnet) == 9
 
     def test_init_invalid_width_raises_exception(self):
         with pytest.raises(ValueError):
-            VAEModel(64, 500)
+            VAEModel(500)
 
-    @pytest.mark.parametrize('ndim', [2, 4, 8, 16, 32, 64, 128])
-    def test_forward(self, ndim):
-        model = VAEModel(ndim, 512)
-        input = torch.ones((5, 3, 512, 512))
+    @pytest.mark.parametrize('img_width', [16, 32, 64, 128, 512])
+    def test_forward(self, img_width):
+        model = VAEModel(img_width)
+        input = torch.ones((5, 3, img_width, img_width))
 
         with torch.no_grad():
             mu, sigma, reconst = model(input)
 
         assert mu.shape == sigma.shape
-        assert mu.dim() == 4
+        assert mu.dim() == 2
         assert mu.shape[0] == 5
-        assert mu.shape[1] == ndim
+        assert mu.shape[1] == img_width
 
         assert reconst.shape == input.shape
 
     def test_forward_invalid_input_raises_exception(self):
         input = torch.ones((8, 3, 64, 64))
         with pytest.raises(ValueError):
-            model = VAEModel(8, 128)
+            model = VAEModel(128)
             model(input)
 
 
 class TestVariationalAutoencoder(object):
     '''Test the VariationalAutoencoder class.'''
     def test_init(self):
-        vae = VariationalAutoencoder(64, 512)
+        vae = VariationalAutoencoder(512)
         assert len(vae.model.encoder.convnet) == 9
         assert len(vae.model.decoder.convnet) == 9
 
@@ -163,7 +159,7 @@ class TestVariationalAutoencoder(object):
         input = torch.ones((nimg, 3, 32, 32))
 
         with torch.no_grad():
-            vae = VariationalAutoencoder(2, 32)
+            vae = VariationalAutoencoder(32)
             scores = vae.score(input)
 
         assert scores['elbo'].dim() == 0
@@ -172,7 +168,7 @@ class TestVariationalAutoencoder(object):
     @pytest.mark.parametrize('nimg', [1, 2, 3, 4])
     def test_train(self, nimg):
         input = torch.ones((nimg, 3, 32, 32))
-        vae = VariationalAutoencoder(2, 32)
+        vae = VariationalAutoencoder(32)
         cost = vae.train(input)
         assert 'elbo' in cost
         assert cost['elbo'].allclose(cost['log_likelihood'] - cost['kl'])
@@ -180,19 +176,19 @@ class TestVariationalAutoencoder(object):
     @pytest.mark.parametrize('nimg', [1, 2, 3, 4])
     def test_infer(self, nimg):
         input = torch.ones((nimg, 3, 32, 32))
-        vae = VariationalAutoencoder(2, 32)
+        vae = VariationalAutoencoder(32)
         mu, sigma = vae.infer(input)
 
         print(mu.shape)
 
         assert mu.dim() == 2
-        assert mu.shape[0] == nimg and mu.shape[1] == 2
+        assert mu.shape[0] == nimg and mu.shape[1] == 32
         assert mu.shape == sigma.shape
 
     @pytest.mark.parametrize('nimg', [1, 2, 3, 4])
     def test_generate(self, nimg):
-        input = torch.ones((nimg, 2))
-        vae = VariationalAutoencoder(2, 32)
+        input = torch.ones((nimg, 32))
+        vae = VariationalAutoencoder(32)
         reconst = vae.generate(input)
 
         assert reconst.dim() == 4
@@ -214,7 +210,7 @@ class TestVariationalAutoencoder(object):
                 assert not elem.is_cuda
 
         input = torch.ones((1, 3, 32, 32)).cuda()
-        vae = VariationalAutoencoder(2, 32)
+        vae = VariationalAutoencoder(32)
         vae.to_gpu()
         vae.model.apply(on_gpu)
 
@@ -226,14 +222,14 @@ class TestVariationalAutoencoder(object):
         vae.model.apply(on_cpu)
 
     def test_to_dict(self):
-        vae = VariationalAutoencoder(2, 32)
+        vae = VariationalAutoencoder(32)
         rep = vae.to_dict()
 
         assert rep['width'] == 32
-        assert rep['dimensions'] == 2
+        assert rep['dimensions'] == 32
 
     def test_from_dict(self):
-        vae = VariationalAutoencoder(2, 32)
+        vae = VariationalAutoencoder(32)
         alt = VariationalAutoencoder.from_dict(vae.to_dict())
-        assert alt._ndim == 2
+        assert alt._ndim == 32
         assert alt._width == 32
